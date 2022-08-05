@@ -1,0 +1,20 @@
+version: "3"
+
+volumes:
+  broker_postgres_data:
+
+services:
+  pg_broker:
+    # image: dockerproxy.bale.ai/postgres
+    image: postgres:9.5.22
+    container_name: "pg_broker"
+    restart: always
+    environment:
+      - POSTGRES_DB=broker_db
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=123456
+      - TZ=Asia/Tehran
+    ports:
+      - "5463:5432"
+    volumes:
+      - broker_postgres_data:/var/lib/postgresql/data

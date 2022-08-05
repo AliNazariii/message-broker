@@ -1,0 +1,23 @@
+postgres:
+  host: "127.0.0.1"
+  port: 5432
+  db: "broker_db"
+  user: "admin"
+  pass: "123456"
+log:
+  level: debug
+grpc:
+  address: ":3606"
+prometheus:
+  port: 8083
+cassandra:
+  hosts: [ "127.0.0.1" ]
+  datacenter: "datacenter1"
+  port: 9042
+  user: "cassandra"
+  password: "cassandra"
+  keyspace: "nazari_broker"
+  consistency: "LOCAL_ONE"
+  pagesize: 5000
+  timeout: 16000
+  partition_size: 10

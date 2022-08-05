@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: nazari-broker
+  name: nazari-broker-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nazari-broker
+  template:
+    metadata:
+      name: nazari-broker-pod
+      labels:
+        app: nazari-broker
+    spec:
+      containers:
+        - name: nazari-broker-container
+          image: docker.havij.ai/havij/nazari-broker:0.0.1
+          envFrom:
+            - configMapRef:
+                name: nazari-broker-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: nazari-broker
+  name: nazari-broker-service
+spec:
+  ports:
+    - name: broker-grpc
+      port: 3606
+      targetPort: 3606
+      nodePort: 30606
+    - name: prometheus
+      port: 8080
+      targetPort: 8080
+      nodePort: 30808
+  selector:
+    app: nazari-broker
+  type: NodePort
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  labels:
+    app: nazari-broker
+  name: nazari-broker-config
+data:
+  BROKER_POSTGRES_HOST: "192.168.100.35"
+  BROKER_POSTGRES_PORT: "5463"
+  BROKER_POSTGRES_DB: "broker_db"
+  BROKER_POSTGRES_USER: "admin"
+  BROKER_POSTGRES_PASS: "123456"
+
+  BROKER_CORE_SERVICE_NAME: "broker"
+  BROKER_LOG_LEVEL: "DEBUG"
+  BROKER_PROMETHEUS_PORT: "8080"
+  BROKER_GRPC_ADDRESS: ":3606"

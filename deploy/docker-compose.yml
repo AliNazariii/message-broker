@@ -1,0 +1,33 @@
+version: '3'
+
+services:
+  broker:
+    image: docker.havij.ai/havij/nazari-broker:0.0.2
+    hostname: broker
+    container_name: nazari-broker-container
+    restart: always
+    environment:
+      - BROKER_POSTGRES_HOST=192.168.1.36
+      - BROKER_POSTGRES_PORT=5463
+      - BROKER_POSTGRES_DB=broker_db
+      - BROKER_POSTGRES_USER=admin
+      - BROKER_POSTGRES_PASS=123456
+
+      - BROKER_CASSANDRA_HOSTS=192.168.70.159
+      - BROKER_CASSANDRA_DATACENTER=dc1
+      - BROKER_CASSANDRA_PORT=9042
+      - BROKER_CASSANDRA_KEYSPACE=nazari_broker
+      - BROKER_CASSANDRA_USER=cassandra
+      - BROKER_CASSANDRA_PASSWORD=cassandra
+      - BROKER_CASSANDRA_CONSISTENCY=LOCAL_ONE
+      - BROKER_CASSANDRA_PAGE_SIZE=5000
+      - BROKER_CASSANDRA_TIMEOUT=16000
+      - BROKER_CASSANDRA_PARTITION_SIZE=10
+
+      - BROKER_CORE_SERVICE_NAME=broker
+      - BROKER_LOG_LEVEL=DEBUG
+      - BROKER_PROMETHEUS_PORT=8083
+      - BROKER_GRPC_ADDRESS=:3606
+    ports:
+      - "8083:8083"
+      - "3606:3606"
