@@ -1,182 +1,90 @@
 package config
 
 import (
-	"bytes"
-	"fmt"
-	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
-	"io/ioutil"
-	"strings"
+	"time"
 )
 
-const defaultConf = `
-core:
-  service_name: "Unknown"
-postgres:
-  host: ""
-  port: 5432
-  db: ""
-  user: ""
-  pass: ""
-  batch_count: 5
-prometheus:
-  port: 8080
-log:
-  level: debug
-grpc:
-  address: "127.0.0.1:5050"
-jaeger:
-  address: "localhost:6831"
-cassandra:
-  hosts: [ "192.168.70.2" ]
-  datacenter: "dc1"
-  port: 9042
-  user: ""
-  password: ""
-  keyspace: "nazari"
-  consistency: "LOCAL_ONE"
-  pagesize: 5000
-  timeout: 16000
-  partition_size: 10
-`
-
-type Config struct {
-	defaultConf []byte
-	configPath  string
-	serviceName string
-
-	Core       SectionCore       `yaml:"core"`
-	Postgres   SectionPostgres   `yaml:"postgres"`
-	Prometheus SectionPrometheus `yaml:"prometheus"`
-	Log        SectionLog        `yaml:"log"`
-	Grpc       SectionGrpc       `yaml:"grpc"`
-	Jaeger     SectionJaeger     `yaml:"jaeger"`
-	Cassandra  SectionCassandra  `yaml:"cassandra"`
+type Core struct {
+	ServiceName string
 }
 
-type SectionCore struct {
-	ServiceName string `mapstructure:"service_name"`
+type Prometheus struct {
+	Port string
 }
 
-type SectionPostgres struct {
-	Host       string `yaml:"host"`
-	Port       int    `yaml:"port"`
-	DB         string `yaml:"db"`
-	User       string `yaml:"user"`
-	Pass       string `yaml:"pass"`
-	BatchCount int    `mapstructure:"batch_count"`
+type Log struct {
+	Level string
 }
 
-type SectionPrometheus struct {
-	Port string `yaml:"port"`
+type Grpc struct {
+	Address string
 }
 
-type SectionLog struct {
-	Level string `yaml:"level"`
+type Graylog struct {
+	Level       string
+	Host        string
+	Port        int
+	Facility    string
+	Compression bool
 }
 
-type SectionGrpc struct {
-	Address string `yaml:"address"`
+type Jaeger struct {
+	Address string
 }
 
-type SectionGraylog struct {
-	Level       string `yaml:"level"`
-	Host        string `yaml:"host"`
-	Port        int    `yaml:"port"`
-	Facility    string `yaml:"facility"`
-	Compression bool   `yaml:"compression"`
+type Cassandra struct {
+	Hosts         []string
+	Port          int
+	Username      string
+	Password      string
+	KeySpace      string
+	Consistency   string
+	PageSize      int
+	Timeout       int64
+	DataCenter    string
+	PartitionSize int32
 }
 
-type SectionJaeger struct {
-	Address string `yaml:"address"`
+type Postgres struct {
+	Host               string
+	Port               int
+	DB                 string
+	User               string
+	Pass               string
+	BatchCount         int
+	MaxIdleConnections int
+	MaxOpenConnections int
+	ConnMaxLifetime    time.Duration
 }
 
-type SectionCassandra struct {
-	Hosts         []string `yaml:"hosts"`
-	Port          int      `yaml:"port"`
-	Username      string   `yaml:"user"`
-	Password      string   `yaml:"password"`
-	KeySpace      string   `yaml:"keyspace"`
-	Consistency   string   `yaml:"consistency"`
-	PageSize      int      `yaml:"pagesize"`
-	Timeout       int64    `yaml:"timeout"`
-	DataCenter    string   `yaml:"datacenter"`
-	PartitionSize int32    `yaml:"partition_size"`
-}
+func SetDefaults() {
+	viper.SetDefault("Postgres.Host", "localhost")
+	viper.SetDefault("Postgres.Port", 5432)
+	viper.SetDefault("Postgres.DB", "defaultdb")
+	viper.SetDefault("Postgres.User", "user")
+	viper.SetDefault("Postgres.Pass", "password")
+	viper.SetDefault("Postgres.BatchCount", 5)
+	viper.SetDefault("Postgres.MaxIdleConnections", 10)
+	viper.SetDefault("Postgres.MaxOpenConnections", 50)
+	viper.SetDefault("Postgres.ConnMaxLifetime", time.Minute*5)
 
-func (c *Config) configureViper() {
-	viper.SetConfigType("yaml")
-	viper.AutomaticEnv()                                            // read in environment variables that match
-	viper.SetEnvPrefix(strings.ReplaceAll(c.serviceName, "-", "_")) // will be uppercase automatically
-	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+	viper.SetDefault("Prometheus.Port", 9000)
 
-	viper.AddConfigPath("/etc/" + c.serviceName + "/")
-	viper.AddConfigPath("$HOME/." + c.serviceName)
-	viper.AddConfigPath(".")
-	viper.SetConfigName("config")
-}
+	viper.SetDefault("Log.Level", "debug")
 
-// LoadConf load config from file and read in environment variables that match
-func (c *Config) loadConf() error {
-	c.configureViper()
+	viper.SetDefault("Grpc.Address", "127.0.0.1:8888")
 
-	if err := c.readConf(); err != nil {
-		return err
-	}
+	viper.SetDefault("Jaeger.Address", "localhost:6831")
 
-	err := viper.Unmarshal(&c)
-	if err != nil {
-		fmt.Println("unable to decode into config struct, ", err)
-		return err
-	}
-
-	return nil
-}
-
-func readConfFromFile(confPath string) error {
-	if confPath != "" {
-		content, err := ioutil.ReadFile(confPath)
-
-		if err != nil {
-			log.Errorf("File does not exist : %s", confPath)
-			return err
-		}
-
-		if err := viper.ReadConfig(bytes.NewBuffer(content)); err != nil {
-			return err
-		}
-	} else {
-		// If a config file is found, read it in.
-		if err := viper.MergeInConfig(); err == nil {
-			fmt.Println("Using config file:", viper.ConfigFileUsed())
-		} else {
-			fmt.Println("Config file not found.")
-		}
-	}
-	return nil
-}
-
-func (c *Config) readConf() error {
-	// load default config
-	if err := viper.ReadConfig(bytes.NewBuffer(c.defaultConf)); err != nil {
-		return err
-	}
-	if err := readConfFromFile(c.configPath); err != nil {
-		return err
-	}
-	return nil
-}
-
-func New(path string, serviceName string) *Config {
-	conf := Config{
-		defaultConf: []byte(defaultConf),
-		configPath:  path,
-		serviceName: serviceName,
-	}
-	err := conf.loadConf()
-	if err != nil {
-		log.Fatalf("Load yaml config file error: '%v'", err)
-		return nil
-	}
-	return &conf
+	viper.SetDefault("Cassandra.Hosts", []string{"127.0.0.1"})
+	viper.SetDefault("Cassandra.Port", 9042)
+	viper.SetDefault("Cassandra.Username", "cassandra")
+	viper.SetDefault("Cassandra.Password", "cassandra")
+	viper.SetDefault("Cassandra.KeySpace", "nazari")
+	viper.SetDefault("Cassandra.Consistency", "LOCAL_ONE")
+	viper.SetDefault("Cassandra.PageSize", 5000)
+	viper.SetDefault("Cassandra.Timeout", 16000)
+	viper.SetDefault("Cassandra.DataCenter", "dc1")
+	viper.SetDefault("Cassandra.PartitionSize", 10)
 }

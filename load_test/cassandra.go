@@ -6,8 +6,6 @@ import (
 	"sync"
 	"therealbroker/internal/repositories"
 	"therealbroker/pkg/config"
-	"therealbroker/pkg/database"
-	"therealbroker/pkg/log"
 	"time"
 )
 
@@ -17,11 +15,11 @@ const CassREQUESTS = 10000
 var subjects = []rune("abcdefghijklmnopqrstuvwxyz")
 
 func main() {
-	logger := log.NewLog("debug")
+	logger := logger.NewLog("debug")
 	conf := config.New("config.yaml", "broker")
-	brokerCassandra := database.NewCassandraDB(logger, &conf.Cassandra)
+	brokerCassandra := cassandra.NewCassandraDB(logger, &conf.Cassandra)
 	messageRepo := repositories.NewCasMessageRepo(brokerCassandra, logger, &conf.Cassandra)
-	latestIds, _ := messageRepo.GetTopicLatestIds()
+	latestIds, _ := messageRepo.GetTopicLatestIDs()
 	var l sync.Mutex
 
 	overallLatency := 0

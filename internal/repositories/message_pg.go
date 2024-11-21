@@ -1,6 +1,15 @@
 package repositories
 
-import "time"
+import (
+	"errors"
+	"sync"
+	"time"
+
+	"github.com/sirupsen/logrus"
+	"gorm.io/gorm"
+
+	"therealbroker/pkg/postgresql"
+)
 
 // psql -U admin broker_db
 // \dt
@@ -11,15 +20,7 @@ CREATE INDEX borker_message_subject_idx
 ON pg_messages (subject);
 */
 
-import (
-	"errors"
-	"gorm.io/gorm"
-	"sync"
-	"therealbroker/pkg/database"
-	"therealbroker/pkg/log"
-)
-
-type PgMessage struct {
+type MessagePostgres struct {
 	PID        int    `gorm:"primary_key;auto_increment:true"`
 	ID         int    `gorm:"not null"`
 	Subject    string `gorm:"not null"`
@@ -29,44 +30,56 @@ type PgMessage struct {
 	UpdatedAt  time.Time
 }
 
-type PgMessageImpl struct {
-	db           *database.PostgresDB
-	log          *log.Logger
-	messages     []*PgMessage
+type MessagesPostgres struct {
+	db           *postgresql.DB
+	messages     []*MessagePostgres
 	channels     []chan bool
 	messagesLock sync.Mutex
 	ticker       *time.Ticker
 }
 
-func NewPgMessagesRepo(db *database.PostgresDB, log *log.Logger) *PgMessageImpl {
-	messages := make([]*PgMessage, 0)
+func NewMessagesPostgres(db *postgresql.DB) *MessagesPostgres {
+	messages := make([]*MessagePostgres, 0)
 	channels := make([]chan bool, 0)
+
 	ticker := time.NewTicker(time.Microsecond * 5)
-	mi := &PgMessageImpl{db: db, log: log, messages: messages, ticker: ticker, channels: channels}
+
+	mi := &MessagesPostgres{
+		db:       db,
+		messages: messages,
+		ticker:   ticker,
+		channels: channels,
+	}
+
 	mi.WriteMessages()
+
 	return mi
 }
 
-func (mi *PgMessageImpl) GetTopicLatestIds() (map[string]int, error) {
+func (mi *MessagesPostgres) GetTopicLatestIDs() (map[string]int, error) {
 	latestIds := make(map[string]int)
-	rows, err := mi.db.DB.Model(&PgMessage{}).Select("subject, max(id) as latestId").Group("subject").Rows()
+
+	rows, err := mi.db.DB.Model(&MessagePostgres{}).Select("subject, max(id) as latestId").Group("subject").Rows()
 	if err != nil {
 		return latestIds, err
 	}
+
 	for rows.Next() {
 		var subject string
 		var latestId int
-		err := rows.Scan(&subject, &latestId)
+
+		err = rows.Scan(&subject, &latestId)
 		if err != nil {
 			return latestIds, err
 		}
+
 		latestIds[subject] = latestId
 	}
 	return latestIds, nil
 }
 
-func (mi *PgMessageImpl) GetByTopicAndId(id int, subject string) (Message, error) {
-	var message PgMessage
+func (mi *MessagesPostgres) GetByTopicAndID(id int, subject string) (Message, error) {
+	var message MessagePostgres
 	err := mi.db.DB.Where("id = ? AND subject = ?", id, subject).First(&message).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return Message{}, err
@@ -79,8 +92,8 @@ func (mi *PgMessageImpl) GetByTopicAndId(id int, subject string) (Message, error
 		CreatedAt:  message.CreatedAt}, nil
 }
 
-func (mi *PgMessageImpl) AddMessage(id int, subject string, body string, expiration int64) {
-	message := PgMessage{ID: id, Subject: subject, Body: body, Expiration: expiration}
+func (mi *MessagesPostgres) AddMessage(id int, subject string, body string, expiration int64) {
+	message := MessagePostgres{ID: id, Subject: subject, Body: body, Expiration: expiration}
 
 	//mi.db.DB.Create(&message)
 
@@ -94,7 +107,7 @@ func (mi *PgMessageImpl) AddMessage(id int, subject string, body string, expirat
 	return
 }
 
-func (mi *PgMessageImpl) WriteMessages() {
+func (mi *MessagesPostgres) WriteMessages() {
 	go func() {
 		latencies := make([]time.Duration, 0)
 		for {
@@ -107,7 +120,7 @@ func (mi *PgMessageImpl) WriteMessages() {
 				mi.messagesLock.Lock()
 
 				messages := mi.messages
-				mi.messages = make([]*PgMessage, 0)
+				mi.messages = make([]*MessagePostgres, 0)
 
 				channels := mi.channels
 				mi.channels = make([]chan bool, 0)
@@ -122,7 +135,7 @@ func (mi *PgMessageImpl) WriteMessages() {
 					average += latency
 				}
 				average = average / time.Duration(len(latencies))
-				mi.log.Debugln("Wrote", len(messages), "Average latency:", average)
+				logrus.Debugln("Wrote", len(messages), "Average latency:", average)
 
 				for _, channel := range channels {
 					channel <- true

@@ -5,7 +5,6 @@ import (
 	"google.golang.org/grpc"
 	"math/rand"
 	api "therealbroker/api/proto/src/broker/api/proto"
-	"therealbroker/pkg/log"
 	"time"
 )
 
@@ -14,7 +13,7 @@ const REQUESTS = 80000
 
 var letters = []rune("abcdefghijklmnopqrstuvwxyz")
 
-func Publish(client api.BrokerClient, logger *log.Logger) {
+func Publish(client api.BrokerClient, logger *logger.Logger) {
 	_, err := client.Publish(context.Background(), &api.PublishRequest{
 		Subject: string(letters[rand.Intn(len(letters))]),
 		//Subject:           "zzzzz",
@@ -27,11 +26,11 @@ func Publish(client api.BrokerClient, logger *log.Logger) {
 	}
 }
 
-func Fetch(client api.BrokerClient, logger *log.Logger) {
+func Fetch(client api.BrokerClient, logger *logger.Logger) {
 	_, err := client.Fetch(context.Background(), &api.FetchRequest{
 		//Subject: string(letters[rand.Intn(len(letters))]),
 		Subject: "zzzzz",
-		Id: 2,
+		Id:      2,
 	})
 	if err != nil {
 		logger.Errorln("Error fetching message: ", err)
@@ -40,7 +39,7 @@ func Fetch(client api.BrokerClient, logger *log.Logger) {
 }
 
 func main() {
-	logger := log.NewLog("debug")
+	logger := logger.NewLog("debug")
 
 	conn, err := grpc.Dial("localhost:3606", grpc.WithInsecure())
 	if err != nil {

@@ -3,22 +3,23 @@ package broker
 import (
 	"context"
 	"errors"
+	"github.com/sirupsen/logrus"
 	"sync"
 	"therealbroker/internal/repositories"
 	"therealbroker/pkg/broker"
-	"therealbroker/pkg/log"
 	"time"
 )
 
 type Subscriber struct {
 	id     int
 	stream chan broker.Message
+
 	// isStopped is true on context cancel
 	isStopped bool
 }
 
 type Module struct {
-	latestSubscriberId int
+	latestSubscriberID int
 	subscribers        map[string][]*Subscriber
 	subscribersLock    sync.Mutex
 
@@ -26,20 +27,27 @@ type Module struct {
 	latestIds     map[string]int
 	isClosed      bool
 
-	log         *log.Logger
-	MessageRepo repositories.MessageRepo
+	messagesRepo repositories.MessageRepo
 }
 
-func NewModule(log *log.Logger, messageRepo repositories.MessageRepo) broker.Broker {
-	log.Debugln("NewModule")
+func NewModule(messagesRepo repositories.MessageRepo) broker.Broker {
 	subscribers := make(map[string][]*Subscriber)
-	latestIds, _ := messageRepo.GetTopicLatestIds()
-	log.Debugln("latestIds", latestIds)
-	return &Module{subscribers: subscribers, isClosed: false, latestIds: latestIds, log: log, MessageRepo: messageRepo}
+
+	latestIDs, err := messagesRepo.GetTopicLatestIDs()
+	if err != nil {
+		// TODO: handle error
+		logrus.Debugln("messagesRepo.GetTopicLatestIDs", err.Error())
+	}
+
+	return &Module{
+		subscribers:  subscribers,
+		isClosed:     false,
+		latestIds:    latestIDs,
+		messagesRepo: messagesRepo,
+	}
 }
 
 func (m *Module) Close() error {
-	m.log.Debugln("Close")
 	if m.isClosed == true {
 		return nil
 	}
@@ -49,7 +57,7 @@ func (m *Module) Close() error {
 			close(subscriber.stream)
 		}
 	}
-	m.log.Debugln("Closed")
+	logrus.Debugln("Closed")
 	m.isClosed = true
 	return nil
 }
@@ -70,7 +78,7 @@ func (m *Module) Publish(ctx context.Context, subject string, msg broker.Message
 	go func(id int, subject string, msg broker.Message) {
 		defer wg.Done()
 		if msg.Expiration != 0 {
-			m.MessageRepo.AddMessage(id, subject, msg.Body, int64(msg.Expiration))
+			m.messagesRepo.AddMessage(id, subject, msg.Body, int64(msg.Expiration))
 		}
 	}(id, subject, msg)
 
@@ -89,14 +97,14 @@ func (m *Module) Publish(ctx context.Context, subject string, msg broker.Message
 }
 
 func (m *Module) Subscribe(ctx context.Context, subject string) (<-chan broker.Message, error) {
-	m.log.Debugln("Subscribe", subject)
+	logrus.Debugln("Subscribe", subject)
 	if m.isClosed == true {
 		return nil, broker.ErrUnavailable
 	}
 
 	m.subscribersLock.Lock()
-	m.latestSubscriberId++
-	id := m.latestSubscriberId
+	m.latestSubscriberID++
+	id := m.latestSubscriberID
 	m.subscribersLock.Unlock()
 
 	m.subscribersLock.Lock()
@@ -115,20 +123,20 @@ func (m *Module) Subscribe(ctx context.Context, subject string) (<-chan broker.M
 }
 
 func (m *Module) Fetch(ctx context.Context, subject string, id int) (broker.Message, error) {
-	m.log.Debugln("Fetch")
+	logrus.Debugln("Fetch")
 	if m.isClosed == true {
 		return broker.Message{}, broker.ErrUnavailable
 	}
 
-	message, err := m.MessageRepo.GetByTopicAndId(id, subject)
+	message, err := m.messagesRepo.GetByTopicAndID(id, subject)
 	if err != nil {
-		m.log.Debugln("MessageRepo.GetByTopicAndId", err.Error())
+		logrus.Debugln("messagesRepo.GetByTopicAndID", err.Error())
 		return broker.Message{}, broker.ErrInvalidID
 	}
 
 	if time.Now().Before(message.CreatedAt.Add(time.Duration(message.Expiration))) {
 		return broker.Message{Body: message.Body, Expiration: time.Duration(message.Expiration)}, nil
 	}
-	m.log.Debugln("expired", "now:", time.Now(), "createdAt:", message.CreatedAt, "duration:", message.Expiration)
+	logrus.Debugln("expired", "now:", time.Now(), "createdAt:", message.CreatedAt, "duration:", message.Expiration)
 	return broker.Message{}, broker.ErrExpiredID
 }

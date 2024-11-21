@@ -11,7 +11,7 @@ type Message struct {
 }
 
 type MessageRepo interface {
-	GetTopicLatestIds() (map[string]int, error)
-	GetByTopicAndId(id int, subject string) (Message, error)
+	GetTopicLatestIDs() (map[string]int, error)
+	GetByTopicAndID(id int, subject string) (Message, error)
 	AddMessage(id int, subject string, body string, expiration int64)
 }

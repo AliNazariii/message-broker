@@ -9,8 +9,6 @@ import (
 	"therealbroker/internal/repositories"
 	"therealbroker/pkg/broker"
 	"therealbroker/pkg/config"
-	"therealbroker/pkg/database"
-	"therealbroker/pkg/log"
 	"time"
 )
 
@@ -23,13 +21,13 @@ var (
 func TestMain(m *testing.M) {
 	rand.Seed(time.Now().Unix())
 
-	logger := log.NewLog("DEBUG")
+	logger := logger.NewLog("DEBUG")
 	conf := config.New("../../config.yaml", "test-broker")
 
-	//brokerPostgres := database.NewPostgresDB(logger, &conf.Postgres, &repositories.PgMessage{})
-	//messageRepo := repositories.NewPgMessagesRepo(brokerPostgres, logger)
+	//brokerPostgres := database.NewPostgresDB(logger, &conf.Postgres, &repositories.MessagePostgres{})
+	//messageRepo := repositories.NewMessagesPostgres(brokerPostgres, logger)
 
-	brokerCassandra := database.NewCassandraDB(logger, &conf.Cassandra)
+	brokerCassandra := cassandra.NewCassandraDB(logger, &conf.Cassandra)
 	messageRepo := repositories.NewCasMessageRepo(brokerCassandra, logger, &conf.Cassandra)
 
 	service = NewModule(logger, messageRepo)

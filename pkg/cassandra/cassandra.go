@@ -1,24 +1,23 @@
-package database
+package cassandra
 
 import (
 	"github.com/gocql/gocql"
+	"github.com/sirupsen/logrus"
 	"therealbroker/pkg/config"
-	"therealbroker/pkg/log"
 	"time"
 )
 
-type CassandraDB struct {
-	log     *log.Logger
+type DB struct {
 	Session *gocql.Session
 }
 
-func NewCassandraDB(log *log.Logger, conf *config.SectionCassandra) *CassandraDB {
-	db := CassandraDB{}
+func NewDB(conf *config.Cassandra) *DB {
+	db := DB{}
 
 	consistency, err := gocql.ParseConsistencyWrapper(conf.Consistency)
 	if err != nil {
 		consistency = gocql.LocalOne
-		log.Infof("Error in consistency, so set to %s", consistency)
+		logrus.Infof("Error in consistency, so set to %s", consistency)
 	}
 
 	cluster := gocql.NewCluster(conf.Hosts...)
@@ -40,7 +39,7 @@ func NewCassandraDB(log *log.Logger, conf *config.SectionCassandra) *CassandraDB
 	db.Session, err = cluster.CreateSession()
 
 	if err != nil {
-		log.Fatalf("Unable to create cassandra session. %s", err)
+		logrus.Fatalf("Unable to create cassandra session. %s", err)
 	}
 	return &db
 }

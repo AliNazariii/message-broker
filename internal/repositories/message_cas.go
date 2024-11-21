@@ -2,14 +2,16 @@ package repositories
 
 import (
 	"errors"
-	"github.com/gocql/gocql"
-	"go.uber.org/atomic"
 	"strconv"
 	"sync"
-	"therealbroker/pkg/config"
-	"therealbroker/pkg/database"
-	"therealbroker/pkg/log"
 	"time"
+
+	"github.com/gocql/gocql"
+	"github.com/sirupsen/logrus"
+	"go.uber.org/atomic"
+
+	"therealbroker/pkg/cassandra"
+	"therealbroker/pkg/config"
 )
 
 // https://www.guru99.com/cassandra-tutorial.html
@@ -37,23 +39,22 @@ CREATE TABLE nazari_broker.message (
 */
 
 type CasMessageImpl struct {
-	log          *log.Logger
-	db           *database.CassandraDB
+	db           *cassandra.DB
 	ticker       *time.Ticker
 	messages     []*Message
 	channels     []chan bool
 	messagesLock sync.Mutex
 }
 
-func NewCasMessageRepo(db *database.CassandraDB, log *log.Logger, conf *config.SectionCassandra) *CasMessageImpl {
+func NewCasMessageRepo(db *cassandra.DB, conf *config.Cassandra) *CasMessageImpl {
 	keySpace, _ := db.Session.KeyspaceMetadata(conf.KeySpace)
-	log.Debugln("Tables:", keySpace.Tables)
+	logrus.Debugln("Tables:", keySpace.Tables)
 	if _, exists := keySpace.Tables["message"]; exists != true {
 		err := db.Session.Query("CREATE TABLE message (" +
 			"id int, subject text, body text, expiration bigint, created_at timestamp, " +
 			"PRIMARY KEY ((subject), id))").Exec()
 		if err != nil {
-			log.Fatal(err)
+			logrus.Fatal(err)
 		}
 	}
 
@@ -61,7 +62,6 @@ func NewCasMessageRepo(db *database.CassandraDB, log *log.Logger, conf *config.S
 	channels := make([]chan bool, 0)
 	ticker := time.NewTicker(time.Microsecond * 5)
 	mi := &CasMessageImpl{
-		log:      log,
 		db:       db,
 		ticker:   ticker,
 		messages: messages,
@@ -71,7 +71,7 @@ func NewCasMessageRepo(db *database.CassandraDB, log *log.Logger, conf *config.S
 	return mi
 }
 
-func (mi *CasMessageImpl) GetTopicLatestIds() (map[string]int, error) {
+func (mi *CasMessageImpl) GetTopicLatestIDs() (map[string]int, error) {
 	subjects := make([]string, 0)
 	latestIds := make(map[string]int)
 
@@ -85,14 +85,14 @@ func (mi *CasMessageImpl) GetTopicLatestIds() (map[string]int, error) {
 		var id int
 		err := mi.db.Session.Query("SELECT MAX(id) FROM message WHERE subject = ?", subject).Scan(&id)
 		if err != nil {
-			mi.log.Fatal(err)
+			logrus.Fatal(err)
 		}
 		latestIds[subject] = id
 	}
 	return latestIds, nil
 }
 
-func (mi *CasMessageImpl) GetByTopicAndId(id int, subject string) (Message, error) {
+func (mi *CasMessageImpl) GetByTopicAndID(id int, subject string) (Message, error) {
 	var body string
 	var expiration int64
 	var createdAt time.Time
@@ -108,7 +108,7 @@ func (mi *CasMessageImpl) GetByTopicAndId(id int, subject string) (Message, erro
 		Expiration: expiration,
 		CreatedAt:  createdAt,
 	}
-	mi.log.Debugln(message)
+	logrus.Debugln(message)
 	if errors.Is(err, gocql.ErrNotFound) {
 		return Message{}, err
 	}
@@ -124,7 +124,7 @@ func (mi *CasMessageImpl) AddMessage(id int, subject string, body string, expira
 	//	strconv.FormatInt(expiration, 10) + ", " +
 	//	"toTimestamp(now()))").Exec()
 	//if err != nil {
-	//	mi.log.Debugln(err)
+	//	logrus.Debugln(err)
 	//}
 
 	message := Message{ID: id, Subject: subject, Body: body, Expiration: expiration}
@@ -170,7 +170,7 @@ func (mi *CasMessageImpl) WriteMessages() {
 						requestCount.Inc()
 						err := mi.db.Session.ExecuteBatch(batch)
 						if err != nil {
-							mi.log.Errorln("ExecuteBatch", err)
+							logrus.Errorln("ExecuteBatch", err)
 						}
 						batch = mi.db.Session.NewBatch(gocql.UnloggedBatch)
 					}
@@ -179,7 +179,7 @@ func (mi *CasMessageImpl) WriteMessages() {
 					requestCount.Inc()
 					err := mi.db.Session.ExecuteBatch(batch)
 					if err != nil {
-						mi.log.Errorln("ExecuteBatch", err)
+						logrus.Errorln("ExecuteBatch", err)
 					}
 				}
 
@@ -189,7 +189,7 @@ func (mi *CasMessageImpl) WriteMessages() {
 					average += latency
 				}
 				average = average / time.Duration(len(latencies))
-				mi.log.Debugln("Wrote", len(messages), "Average latency:", average, "Request count:", requestCount.Load(), "Total time:", time.Since(overallStart), "DB Request/sec:", float64(requestCount.Load())/time.Since(overallStart).Seconds())
+				logrus.Debugln("Wrote", len(messages), "Average latency:", average, "Request count:", requestCount.Load(), "Total time:", time.Since(overallStart), "DB Request/sec:", float64(requestCount.Load())/time.Since(overallStart).Seconds())
 
 				for _, channel := range channels {
 					channel <- true

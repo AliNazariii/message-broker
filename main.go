@@ -1,33 +1,37 @@
 package main
 
 import (
-	grpc "therealbroker/api"
-	brokerModule "therealbroker/internal/broker"
-	"therealbroker/internal/prometheus"
+	"google.golang.org/grpc"
+	"therealbroker/api"
+	"therealbroker/api/proto/src/broker/api/proto"
+	"therealbroker/internal/broker"
+	"therealbroker/internal/config"
 	"therealbroker/internal/repositories"
-	"therealbroker/pkg/config"
-	"therealbroker/pkg/database"
-	"therealbroker/pkg/log"
+	grpcPkg "therealbroker/pkg/grpc"
+	"therealbroker/pkg/logger"
+	"therealbroker/pkg/postgresql"
+	"therealbroker/pkg/prometheus"
 )
 
-// Main requirements:
-// 1. All tests should be passed
-// 2. Your logs should be accessible in Graylog
-// 3. Basic prometheus metrics ( latency, throughput, etc. ) should be implemented
-// 	  for every base functionality ( publish, subscribe etc. )
+// use Graylog
 
 func main() {
-	//conf := config.New("config.yaml", "broker")
-	conf := config.New("", "broker")
-	logger := log.NewLog(conf.Log.Level)
-	metrics := prometheus.NewPrometheusServer(logger, conf.Prometheus.Port)
+	conf := config.New("module")
 
-	brokerPostgres := database.NewPostgresDB(logger, &conf.Postgres, &repositories.PgMessage{})
-	messageRepo := repositories.NewPgMessagesRepo(brokerPostgres, logger)
+	logger.Configure(conf.Log.Level)
 
-	//brokerCassandra := database.NewCassandraDB(logger, &conf.Cassandra)
-	//messageRepo := repositories.NewCasMessageRepo(brokerCassandra, logger, &conf.Cassandra)
+	prometheus.StartPrometheusServer(conf.Prometheus.Port)
 
-	broker := brokerModule.NewModule(logger, messageRepo)
-	grpc.New(broker, logger, conf, metrics)
+	brokerPostgres := postgresql.NewDB(&conf.Postgres, &repositories.MessagePostgres{})
+	messageRepo := repositories.NewMessagesPostgres(brokerPostgres)
+
+	//brokerCassandra := cassandra.NewDB(&conf.Cassandra)
+	//messageRepo := repositories.NewCasMessageRepo(brokerCassandra, &conf.Cassandra)
+
+	module := broker.NewModule(messageRepo)
+
+	grpcServer := grpc.NewServer()
+	handler := api.New(module, conf)
+	proto.RegisterBrokerServer(grpcServer, handler)
+	grpcPkg.Serve(&conf.Grpc, grpcServer)
 }
