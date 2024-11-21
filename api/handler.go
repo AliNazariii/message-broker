@@ -3,10 +3,10 @@ package api
 import (
 	"context"
 	"sync"
-	"time"
 
 	"github.com/sirupsen/logrus"
-	api "therealbroker/api/proto/src/broker/api/proto"
+
+	"therealbroker/api/proto/src/broker/api/proto"
 	module "therealbroker/internal/broker"
 	"therealbroker/internal/config"
 	"therealbroker/internal/metrics"
@@ -25,62 +25,52 @@ func New(broker broker.Broker, conf *config.Config) *Handler {
 	}
 }
 
-func (h *Handler) Publish(ctx context.Context, request *api.PublishRequest) (*api.PublishResponse, error) {
-	status := "success"
-	method := "publish"
-	start := time.Now()
+func (h *Handler) Publish(ctx context.Context, request *proto.PublishRequest) (*proto.PublishResponse, error) {
 	response, err := h.broker.Publish(ctx, request.Subject, module.CreateBrokerMessage(request.Body, request.ExpirationSeconds))
 	if err != nil {
-		logrus.Errorln("broker.Publish", err)
-		status = "fail"
+		return nil, err
 	}
-	duration := time.Since(start).Nanoseconds()
-	metrics.MethodDuration.WithLabelValues(method, status).Observe(float64(duration))
-	metrics.MethodCount.WithLabelValues(method, status).Inc()
-	return CreatePublishResponse(response), err
+
+	return &proto.PublishResponse{Id: int32(response)}, nil
 }
 
-func (h *Handler) Subscribe(request *api.SubscribeRequest, stream api.Broker_SubscribeServer) error {
+func (h *Handler) Subscribe(request *proto.SubscribeRequest, stream proto.Broker_SubscribeServer) error {
 	streamChannel, err := h.broker.Subscribe(stream.Context(), request.Subject)
 	if err != nil {
-		logrus.Errorln("broker.Subscribe", err)
 		return err
 	}
 
-	var wg sync.WaitGroup
 	metrics.ActiveSubscribers.Inc()
+	defer metrics.ActiveSubscribers.Dec()
+
+	var wg sync.WaitGroup
 	wg.Add(1)
+
 	go func() {
+		defer wg.Done()
 		for {
 			select {
 			case body := <-streamChannel:
-				err = stream.Send(CreateMessageResponse(body))
-				if err != nil {
-					logrus.Errorln("stream.Send", err)
+				if err = stream.Send(&proto.MessageResponse{Body: []byte(body.Body)}); err != nil {
+					logrus.WithError(err).Error("failed to send message to stream")
+					return
 				}
 			case <-stream.Context().Done():
-				err = stream.Context().Err()
-				wg.Done()
+				logrus.Info("stream context done")
 				return
 			}
 		}
 	}()
 	wg.Wait()
-	metrics.ActiveSubscribers.Dec()
-	return err
+
+	return nil
 }
 
-func (h *Handler) Fetch(ctx context.Context, request *api.FetchRequest) (*api.MessageResponse, error) {
-	status := "success"
-	method := "fetch"
-	start := time.Now()
+func (h *Handler) Fetch(ctx context.Context, request *proto.FetchRequest) (*proto.MessageResponse, error) {
 	response, err := h.broker.Fetch(ctx, request.Subject, int(request.Id))
 	if err != nil {
-		logrus.Errorln("broker.Fetch", err)
-		status = "fail"
+		return nil, err
 	}
-	duration := time.Since(start).Nanoseconds()
-	metrics.MethodDuration.WithLabelValues(method, status).Observe(float64(duration))
-	metrics.MethodCount.WithLabelValues(method, status).Inc()
-	return CreateMessageResponse(response), err
+
+	return &proto.MessageResponse{Body: []byte(response.Body)}, nil
 }

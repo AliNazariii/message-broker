@@ -2,12 +2,14 @@ package main
 
 import (
 	"google.golang.org/grpc"
+
 	"therealbroker/api"
 	"therealbroker/api/proto/src/broker/api/proto"
 	"therealbroker/internal/broker"
 	"therealbroker/internal/config"
 	"therealbroker/internal/repositories"
 	grpcPkg "therealbroker/pkg/grpc"
+	interceptor "therealbroker/pkg/grpc/interceptor"
 	"therealbroker/pkg/logger"
 	"therealbroker/pkg/postgresql"
 	"therealbroker/pkg/prometheus"
@@ -30,7 +32,10 @@ func main() {
 
 	module := broker.NewModule(messageRepo)
 
-	grpcServer := grpc.NewServer()
+	grpcServer := grpc.NewServer(
+		grpc.UnaryInterceptor(interceptor.RPCMetricsInterceptor),
+		grpc.UnaryInterceptor(interceptor.ErrorLoggingInterceptor),
+	)
 	handler := api.New(module, conf)
 	proto.RegisterBrokerServer(grpcServer, handler)
 	grpcPkg.Serve(&conf.Grpc, grpcServer)

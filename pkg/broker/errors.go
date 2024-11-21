@@ -3,12 +3,10 @@ package broker
 import "errors"
 
 var (
-	// Use this error for the calls that are coming after that
-	// server is shutting down
+	// ErrUnavailable Represents an error for requests made after the server has started shutting down.
 	ErrUnavailable = errors.New("service is unavailable")
-	// Use this error when the message with provided id is not available
+	// ErrInvalidID Indicates that the message with the provided ID is not valid or was never published.
 	ErrInvalidID = errors.New("message with id provided is not valid or never published")
-	// Use this error when message had been published, but it is not
-	// available anymore because the expiration time has reached.
+	// ErrExpiredID Indicates that the message with the provided ID has expired and is no longer available.
 	ErrExpiredID = errors.New("message with id provided is expired")
 )

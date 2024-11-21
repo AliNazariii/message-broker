@@ -7,35 +7,31 @@ import (
 )
 
 type Message struct {
-	// This parameter is optional. If it's not provided,
-	// the Message can't be accessible through Fetch()
-	// id is unique per every subject
+	// Identifier for the message, optional.
+	// If not provided, the message is not accessible through Fetch().
+	// Must be unique for each subject.
 	id int
-	// Body of the message
+	// Content of the message.
 	Body string
-	// The time that message can be accessible through Fetch()
-	// with the proper Message id
-	// 0 when there is no need to keep message ( fire & forget mode )
+	// Duration for which the message remains accessible through Fetch().
+	// Set to 0 for messages that do not need to be retained (fire-and-forget).
 	Expiration time.Duration
 }
 
-// The whole implementation should be thread-safe
-// If any problem occurred, return the proper error based on errors.go
+// Broker defines a thread-safe interface for message publishing and retrieval.
+// Appropriate errors are returned based on errors.go.
 type Broker interface {
 	io.Closer
-	// Publish returns an int as the id of message published.
-	// It should preserve the order. So if we are publishing messages
-	// A, B and C, all subscribers should get these messages as
-	// A, B and C.
+	// Publish publishes a message and returns a unique ID.
+	// Guarantees message ordering; for instance, if messages A, B, and C are published,
+	// subscribers receive them in the same order: A, B, C.
 	Publish(ctx context.Context, subject string, msg Message) (int, error)
 
-	// Subscribe listens to every publish, and returns the messages to all
-	// subscribed clients ( channels ).
-	// If the context is cancelled, you have to stop sending messages
-	// to this subscriber. Do nothing on time-out
+	// Subscribe returns a channel that receives messages for a given subject.
+	// When the context is canceled, message delivery to the subscriber stops.
+	// No action occurs on timeout.
 	Subscribe(ctx context.Context, subject string) (<-chan Message, error)
 
-	// Fetch enables us to retrieve a message that is already published, if
-	// it's not expired yet.
+	// Fetch returns a previously published message by ID if it has not expired.
 	Fetch(ctx context.Context, subject string, id int) (Message, error)
 }
