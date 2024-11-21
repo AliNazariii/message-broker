@@ -18,8 +18,3 @@ var (
 			Objectives: map[float64]float64{0.5: 0.05, 0.95: 0.005, 0.99: 0.001},
 		}, []string{"method", "status"})
 )
-
-func init() {
-	prometheus.MustRegister(MethodDuration)
-	prometheus.MustRegister(MethodCount)
-}

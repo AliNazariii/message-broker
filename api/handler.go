@@ -3,11 +3,11 @@ package api
 import (
 	"context"
 	"sync"
+	"time"
 
 	"github.com/sirupsen/logrus"
 
 	"therealbroker/api/proto/src/broker/api/proto"
-	module "therealbroker/internal/broker"
 	"therealbroker/internal/config"
 	"therealbroker/internal/metrics"
 	"therealbroker/pkg/broker"
@@ -26,7 +26,11 @@ func New(broker broker.Broker, conf *config.Config) *Handler {
 }
 
 func (h *Handler) Publish(ctx context.Context, request *proto.PublishRequest) (*proto.PublishResponse, error) {
-	response, err := h.broker.Publish(ctx, request.Subject, module.CreateBrokerMessage(request.Body, request.ExpirationSeconds))
+	response, err := h.broker.Publish(ctx, request.Subject,
+		broker.Message{
+			Body:       string(request.Body),
+			Expiration: time.Duration(request.ExpirationSeconds) * time.Second},
+	)
 	if err != nil {
 		return nil, err
 	}

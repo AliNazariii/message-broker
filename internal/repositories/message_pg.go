@@ -39,16 +39,11 @@ type MessagesPostgres struct {
 }
 
 func NewMessagesPostgres(db *postgresql.DB) *MessagesPostgres {
-	messages := make([]*MessagePostgres, 0)
-	channels := make([]chan bool, 0)
-
-	ticker := time.NewTicker(time.Microsecond * 5)
-
 	mi := &MessagesPostgres{
 		db:       db,
-		messages: messages,
-		ticker:   ticker,
-		channels: channels,
+		messages: make([]*MessagePostgres, 0),
+		ticker:   time.NewTicker(time.Microsecond * 5),
+		channels: make([]chan bool, 0),
 	}
 
 	mi.WriteMessages()
@@ -57,11 +52,11 @@ func NewMessagesPostgres(db *postgresql.DB) *MessagesPostgres {
 }
 
 func (mi *MessagesPostgres) GetTopicLatestIDs() (map[string]int, error) {
-	latestIds := make(map[string]int)
+	latestIDs := make(map[string]int)
 
-	rows, err := mi.db.DB.Model(&MessagePostgres{}).Select("subject, max(id) as latestId").Group("subject").Rows()
+	rows, err := mi.db.Model(&MessagePostgres{}).Select("subject, max(id) as latestID").Group("subject").Rows()
 	if err != nil {
-		return latestIds, err
+		return latestIDs, err
 	}
 
 	for rows.Next() {
@@ -70,17 +65,18 @@ func (mi *MessagesPostgres) GetTopicLatestIDs() (map[string]int, error) {
 
 		err = rows.Scan(&subject, &latestId)
 		if err != nil {
-			return latestIds, err
+			return latestIDs, err
 		}
 
-		latestIds[subject] = latestId
+		latestIDs[subject] = latestId
 	}
-	return latestIds, nil
+
+	return latestIDs, nil
 }
 
 func (mi *MessagesPostgres) GetByTopicAndID(id int, subject string) (Message, error) {
 	var message MessagePostgres
-	err := mi.db.DB.Where("id = ? AND subject = ?", id, subject).First(&message).Error
+	err := mi.db.Where("id = ? AND subject = ?", id, subject).First(&message).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return Message{}, err
 	}
@@ -95,7 +91,7 @@ func (mi *MessagesPostgres) GetByTopicAndID(id int, subject string) (Message, er
 func (mi *MessagesPostgres) AddMessage(id int, subject string, body string, expiration int64) {
 	message := MessagePostgres{ID: id, Subject: subject, Body: body, Expiration: expiration}
 
-	//mi.db.DB.Create(&message)
+	//mi.db.Create(&message)
 
 	channel := make(chan bool)
 	mi.messagesLock.Lock()
@@ -127,7 +123,7 @@ func (mi *MessagesPostgres) WriteMessages() {
 
 				mi.messagesLock.Unlock()
 				start := time.Now()
-				mi.db.DB.CreateInBatches(&messages, 150)
+				mi.db.CreateInBatches(&messages, 150)
 
 				latencies = append(latencies, time.Since(start))
 				average := time.Duration(0)

@@ -11,7 +11,7 @@ import (
 )
 
 type DB struct {
-	DB *gorm.DB
+	*gorm.DB
 }
 
 func NewDB(conf *config.Postgres, models ...interface{}) *DB {

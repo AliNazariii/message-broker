@@ -1,31 +1,63 @@
 # Message Broker
 
-## Introduction
+This project is a **Go-based message broker** designed to efficiently handle message passing, processing, and communication across distributed systems. It provides a robust and scalable infrastructure to enable seamless data flow and integration.
 
-The message broker project aims to implement a message broker that can be used to manage and route messages between various clients. This project includes implementing the broker.Broker interface, using Postgresql and Cassandra for data persistence, adding basic logs and Prometheus metrics, implementing a gRPC API for the broker and main functionalities, creating Dockerfile and docker-compose files for deployment, and deploying the application on a remote machine and Kubernetes (K8).
+---
 
-## Roadmap
+## Project Summary
 
-- [X] Implement `broker.Broker` interface and pass all tests
-- [X] Use postgresql for persisting data
-- [X] Use cassandra for persisting data
-- [X] Add basic logs and prometheus metrics
-  - Metrics for each RPCs:
-    - `method_count` to show count of failed/successful RPC calls
-    - `method_duration` for latency of each call, in 99, 95, 50 quantiles
-    - `active_subscribers` to display total active subscriptions
-  - Env metrics:
-    - Metrics for application memory, cpu load, cpu utilization, GCs
-- [X] Implement gRPC API for the broker and main functionalities
-- [X] Create *dockerfile* and *docker-compose* files for deployment
-- [X] Deploy app with the previous `docker-compose` on a remote machine
-- [X] Deploy app on K8
+The **Message Broker** project is structured to achieve high performance and modularity. Below is a quick overview of its components:
 
-This project is designed to be scalable, reliable, and highly available. The use of Postgresql and Cassandra for data persistence ensures that data is stored safely and can be retrieved quickly when needed. The addition of logs and Prometheus metrics provides insight into how the system is performing, allowing for easy identification of issues and bottlenecks. The implementation of a gRPC API provides a simple and efficient way to communicate with the broker, while the use of Docker and Kubernetes simplifies deployment and management of the application.
+### Project Structure
 
-Overall, this project is a comprehensive implementation of a message broker that can be used in various applications and environments. It provides a reliable and scalable solution that can handle high loads of data and provide real-time insights into system performance.
+- **`load_test/`**: Contains scripts and configurations for performance and load testing to ensure the broker handles high traffic scenarios.
+- **`deploy/`**: Includes deployment configurations, such as containerization or orchestration files.
+- **`internal/`**: Holds internal components that are crucial to the broker's operations but are not exposed as public APIs.
+- **`scripts/`**: Utility scripts to automate tasks like building, testing, or running the project.
+- **`api/`**: Contains API definitions and implementations to interact with the broker, likely including REST or gRPC.
+- **`pkg/`**: Reusable packages that provide helper functions, shared utilities, or core logic for the application.
+- **`main.go`**: The entry point of the application, responsible for initializing the broker and its components.
 
-## Contributing
+---
 
-Contributions to this project are always welcome! Please feel free to open issues or submit pull requests to help improve the
-project.
+## Functionality Details
+
+### Core Features
+
+1. **Message Publishing**: Enables clients to publish messages to specific topics or channels.
+2. **Message Consumption**: Supports subscription to topics, allowing clients to consume messages in real-time or via polling.
+3. **Load Balancing**: Distributes messages among consumers to maintain efficiency and prevent overload.
+4. **Fault Tolerance**: Ensures messages are not lost during failures by incorporating reliable delivery mechanisms.
+5. **Scalability**: Designed to handle increasing workloads through distributed processing and efficient resource utilization.
+
+### Workflow
+
+1. **Initialization**: The application starts from `main.go`, where the core broker services are initialized.
+2. **Client Interaction**: APIs defined in the `api/` folder allow clients to interact with the broker for publishing and consuming messages.
+3. **Message Handling**: The core logic in `internal/` processes messages, ensuring they are routed and delivered correctly.
+4. **Deployment**: The `deploy/` folder includes tools for containerizing the broker or deploying it to environments like Kubernetes.
+
+---
+
+## Getting Started
+
+### Prerequisites
+
+- **Go**: Ensure Go is installed on your system.
+- **Docker (optional)**: For containerized deployment.
+
+### Running the Application
+
+1. Clone the repository:
+   ```bash
+   git clone git@github.com:AliNazariii/message-broker.git
+   ```
+2. Navigate to the project directory:
+   ```bash
+   cd message-broker
+   ```
+3. Build and run the application:
+   ```bash
+   go run main.go
+   ```
+

@@ -15,10 +15,8 @@ import (
 	"therealbroker/pkg/prometheus"
 )
 
-// use Graylog
-
 func main() {
-	conf := config.New("module")
+	conf := config.New("broker")
 
 	logger.Configure(conf.Log.Level)
 

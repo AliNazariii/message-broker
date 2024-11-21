@@ -11,7 +11,3 @@ var (
 		Help: "The total number of active streams",
 	})
 )
-
-func init() {
-	prometheus.MustRegister(ActiveSubscribers)
-}
